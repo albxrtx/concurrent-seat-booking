@@ -1,3 +1,4 @@
+import { useState } from "react";
 interface Props {
   id: string;
   status: string;
@@ -5,11 +6,16 @@ interface Props {
 const statusStyles: Record<string, string> = {
   LIBRE: " bg-slate-500  fill-slate-300",
   RESERVADO: "cursor-not-allowed bg-slate-900  fill-slate-300/50",
-  PENDIENTE: "bg-violet-200  fill-violet-900 shadow-2xl shadow-violet-200/50",
+  PENDIENTE:
+    "cursor-not-allowed  bg-violet-200  fill-violet-900 shadow-2xl shadow-violet-200/50",
 };
 
 function SeatButton({ id, status }: Props) {
+  const [loading, setLoading] = useState(false);
   const reserveSeat = async () => {
+    if (loading) return;
+
+    setLoading(true);
     try {
       const res = await fetch(`http://localhost:8080/seats/${id}`, {
         method: "POST",
@@ -25,6 +31,8 @@ function SeatButton({ id, status }: Props) {
       console.log("Respuesta del servido", data);
     } catch (error) {
       console.error("Error al hacer POST:", error);
+    } finally {
+      setLoading(false);
     }
   };
   return (
