@@ -1,13 +1,12 @@
 package com.example.concurrent_seat_booking.service;
 
-import javax.management.RuntimeErrorException;
-
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import com.example.concurrent_seat_booking.exception.SeatAlreadyReservedException;
+import com.example.concurrent_seat_booking.exception.SeatNotFoundException;
 import com.example.concurrent_seat_booking.model.Seat;
 import com.example.concurrent_seat_booking.repository.SeatRepository;
 
@@ -15,8 +14,6 @@ import jakarta.transaction.Transactional;
 
 @Service
 public class SeatService {
-
-    // todo Añadir WebSockets para mostra en tiempo real las reservas
 
     private final SeatRepository seatRepository;
 
@@ -26,52 +23,54 @@ public class SeatService {
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
-    // @Transactional
-    // public Seat reserveSeat(String id) {
-    // Seat seat = seatRepository.findById(id)
-    // .orElseThrow(() -> new RuntimeException("Seat not found"));
 
-    // if (!seat.getStatus().equals(("LIBRE"))) {
-    // throw new RuntimeException("Seat not available");
-    // }
-
-    // seat.setStatus(("RESERVADO"));
-    // seatRepository.save(seat);
-
-    // try {
-    // return seatRepository.save(seat);
-    // } catch (OptimisticLockingFailureException e) {
-    // throw e;
-    // }
-
-    // }
     @Transactional
     public Seat reserveSeat(String id) {
-        Seat seat = seatRepository.findById(id).orElseThrow(() -> new RuntimeException("ASIENTO NO ENCONTRADO"));
+        // Obtenemos el asiento mediante el ID
+        Seat seat = seatRepository.findById(id).orElseThrow(() -> new SeatNotFoundException("ASIENTO NO ENCONTRADO"));
+        // Comprobamos que el asiento este disponible
         if (!seat.getStatus().equals(("LIBRE"))) {
-            throw new RuntimeException("ASIENTO NO DISPONIBLE");
+            throw new SeatAlreadyReservedException("ASIENTO YA RESERVADO");
         }
+        /*
+         * Cambiamos el estado del asiento a uno intermedio,
+         * notificamos al frontend mediante WebSockets
+         * y guardamos el asiento
+         */
         seat.setStatus("PENDIENTE");
+        messagingTemplate.convertAndSend("/topic/seats", seat);
         seatRepository.save(seat);
 
-        messagingTemplate.convertAndSend("/topic/seats", seat);
-
+        // LLamamos a la función para confirmar la reserva
         confirmReservation(id);
         return seat;
     }
 
+    /*
+     * Método asíncrono para confirmar la reserva
+     * Cambia el estado del asiento a "RESERVADO"
+     */
+
     @Async
     public void confirmReservation(String id) {
         try {
-            Thread.sleep(2000);
-            Seat seat = seatRepository.findById(id).orElseThrow(() -> new RuntimeException("ASIENTO NO ENCONTRADO"));
-            if (seat.getStatus().equals("PENDIENTE")) {
-                seat.setStatus("RESERVADO");
-                messagingTemplate.convertAndSend("/topic/seats", seat);
-                seatRepository.save(seat);
-            }
+            Thread.sleep(1000);
         } catch (Exception e) {
-            // TODO: handle exception
+            Thread.currentThread().interrupt();
+        }
+        // Obtenemos el asiento mediante el ID
+        Seat seat = seatRepository.findById(id)
+                .orElseThrow(() -> new SeatNotFoundException("ASIENTO NO ENCONTRADO"));
+        // Se comprueba si el asiento está pendiente
+        if (seat.getStatus().equals("PENDIENTE")) {
+            /*
+             * Cambiamos el estado del asiento,
+             * notificamos al frontend mediante WebSockets
+             * y guardamos el asiento
+             */
+            seat.setStatus("RESERVADO");
+            messagingTemplate.convertAndSend("/topic/seats", seat);
+            seatRepository.save(seat);
         }
     }
 

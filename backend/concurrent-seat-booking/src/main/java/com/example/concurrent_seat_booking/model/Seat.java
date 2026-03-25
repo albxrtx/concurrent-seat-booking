@@ -4,6 +4,9 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Version;
 
+/*
+    Modelo del asiento
+*/
 @Entity
 public class Seat {
     @Id
@@ -14,6 +17,10 @@ public class Seat {
     @Version
     private Long version;
 
+    /*
+     * Constructores
+     */
+
     public Seat() {
     }
 
@@ -22,6 +29,10 @@ public class Seat {
         this.status = status;
         this.version = version;
     }
+
+    /*
+     * Getters y Setters
+     */
 
     public String getId() {
         return id;
